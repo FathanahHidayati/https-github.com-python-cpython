@@ -63,6 +63,23 @@ jit_error(const char *message)
 static size_t _Py_jit_shim_size = 0;
 
 static int
+address_in_executor_array(_PyExecutorObject **ptrs, size_t count, uintptr_t addr)
+{
+    for (size_t i = 0; i < count; i++) {
+        _PyExecutorObject *exec = ptrs[i];
+        if (exec->jit_code == NULL || exec->jit_size == 0) {
+            continue;
+        }
+        uintptr_t start = (uintptr_t)exec->jit_code;
+        uintptr_t end = start + exec->jit_size;
+        if (addr >= start && addr < end) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int
 address_in_executor_list(_PyExecutorObject *head, uintptr_t addr)
 {
     for (_PyExecutorObject *exec = head;
@@ -94,7 +111,7 @@ _PyJIT_AddressInJitCode(PyInterpreterState *interp, uintptr_t addr)
             return 1;
         }
     }
-    if (address_in_executor_list(interp->executor_list_head, addr)) {
+    if (address_in_executor_array(interp->executor_ptrs, interp->executor_count, addr)) {
         return 1;
     }
     if (address_in_executor_list(interp->executor_deletion_list_head, addr)) {
@@ -717,7 +734,7 @@ _PyJIT_Compile(_PyExecutorObject *executor, const _PyUOpInstruction trace[], siz
     return 0;
 }
 
-/* One-off compilation of the jit entry shim
+/* One-off compilation of the jit entry shim.
  * We compile this once only as it effectively a normal
  * function, but we need to use the JIT because it needs
  * to understand the jit-specific calling convention.
