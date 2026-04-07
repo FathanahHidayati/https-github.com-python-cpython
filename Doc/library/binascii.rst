@@ -48,8 +48,8 @@ The :mod:`!binascii` module defines the following functions:
       Added the *backtick* parameter.
 
 
-.. function:: a2b_base64(string, /, *, padded=True, alphabet=BASE64_ALPHABET, strict_mode=False)
-              a2b_base64(string, /, *, ignorechars, padded=True, alphabet=BASE64_ALPHABET, strict_mode=True)
+.. function:: a2b_base64(string, /, *, padded=True, alphabet=BASE64_ALPHABET, strict_mode=False, canonical=False)
+              a2b_base64(string, /, *, ignorechars, padded=True, alphabet=BASE64_ALPHABET, strict_mode=True, canonical=False)
 
    Convert a block of base64 data back to binary and return the binary data. More
    than one line may be passed at a time.
@@ -83,11 +83,15 @@ The :mod:`!binascii` module defines the following functions:
    * Contains no excess data after padding (including excess padding, newlines, etc.).
    * Does not start with a padding.
 
+   If *canonical* is true, non-zero padding bits in the last group are rejected
+   with :exc:`binascii.Error`, enforcing canonical encoding as defined in
+   :rfc:`4648` section 3.5.  This check is independent of *strict_mode*.
+
    .. versionchanged:: 3.11
       Added the *strict_mode* parameter.
 
    .. versionchanged:: 3.15
-      Added the *alphabet*, *ignorechars* and *padded* parameters.
+      Added the *alphabet*, *ignorechars*, *padded*, and *canonical* parameters.
 
 
 .. function:: b2a_base64(data, *, padded=True, alphabet=BASE64_ALPHABET, wrapcol=0, newline=True)
@@ -113,16 +117,17 @@ The :mod:`!binascii` module defines the following functions:
       Added the *alphabet*, *padded* and *wrapcol* parameters.
 
 
-.. function:: a2b_ascii85(string, /, *, foldspaces=False, adobe=False, ignorechars=b'')
+.. function:: a2b_ascii85(string, /, *, foldspaces=False, adobe=False, ignorechars=b'', canonical=False)
 
    Convert Ascii85 data back to binary and return the binary data.
 
    Valid Ascii85 data contains characters from the Ascii85 alphabet in groups
-   of five (except for the final group, which may have from two to five
+   of five (except for the final group, which may have from two to four
    characters). Each group encodes 32 bits of binary data in the range from
    ``0`` to ``2 ** 32 - 1``, inclusive. The special character ``z`` is
    accepted as a short form of the group ``!!!!!``, which encodes four
-   consecutive null bytes.
+   consecutive null bytes. A single-character final group is always rejected
+   as an encoding violation.
 
    *foldspaces* is a flag that specifies whether the 'y' short sequence
    should be accepted as shorthand for 4 consecutive spaces (ASCII 0x20).
@@ -135,9 +140,19 @@ The :mod:`!binascii` module defines the following functions:
    to ignore from the input.
    This should only contain whitespace characters.
 
+   If *canonical* is true, non-canonical encodings are rejected with
+   :exc:`binascii.Error`.  This enforces that the ``z`` abbreviation is used
+   for all-zero groups (rather than ``!!!!!``), and that partial final groups
+   use the same padding digits the encoder would produce.
+
    Invalid Ascii85 data will raise :exc:`binascii.Error`.
 
    .. versionadded:: 3.15
+
+   .. versionchanged:: next
+      Single-character final groups are now always rejected as encoding
+      violations. Previously they were silently ignored, producing no output
+      bytes.
 
 
 .. function:: b2a_ascii85(data, /, *, foldspaces=False, wrapcol=0, pad=False, adobe=False)
@@ -163,15 +178,16 @@ The :mod:`!binascii` module defines the following functions:
    .. versionadded:: 3.15
 
 
-.. function:: a2b_base85(string, /, *, alphabet=BASE85_ALPHABET, ignorechars=b'')
+.. function:: a2b_base85(string, /, *, alphabet=BASE85_ALPHABET, ignorechars=b'', canonical=False)
 
    Convert Base85 data back to binary and return the binary data.
    More than one line may be passed at a time.
 
    Valid Base85 data contains characters from the Base85 alphabet in groups
-   of five (except for the final group, which may have from two to five
+   of five (except for the final group, which may have from two to four
    characters). Each group encodes 32 bits of binary data in the range from
-   ``0`` to ``2 ** 32 - 1``, inclusive.
+   ``0`` to ``2 ** 32 - 1``, inclusive. A single-character final group is
+   always rejected as an encoding violation.
 
    Optional *alphabet* must be a :class:`bytes` object of length 85 which
    specifies an alternative alphabet.
@@ -179,9 +195,18 @@ The :mod:`!binascii` module defines the following functions:
    *ignorechars* should be a :term:`bytes-like object` containing characters
    to ignore from the input.
 
+   If *canonical* is true, non-canonical encodings in partial final groups
+   are rejected with :exc:`binascii.Error`.  This enforces that the padding
+   digits match what the encoder would produce.
+
    Invalid Base85 data will raise :exc:`binascii.Error`.
 
    .. versionadded:: 3.15
+
+   .. versionchanged:: next
+      Single-character final groups are now always rejected as encoding
+      violations. Previously they were silently ignored, producing no output
+      bytes.
 
 
 .. function:: b2a_base85(data, /, *, alphabet=BASE85_ALPHABET, wrapcol=0, pad=False)
@@ -202,7 +227,7 @@ The :mod:`!binascii` module defines the following functions:
    .. versionadded:: 3.15
 
 
-.. function:: a2b_base32(string, /, *, padded=True, alphabet=BASE32_ALPHABET, ignorechars=b'')
+.. function:: a2b_base32(string, /, *, padded=True, alphabet=BASE32_ALPHABET, ignorechars=b'', canonical=False)
 
    Convert base32 data back to binary and return the binary data.
 
@@ -230,6 +255,10 @@ The :mod:`!binascii` module defines the following functions:
    If *ignorechars* contains the pad character ``'='``,  the pad characters
    presented before the end of the encoded data and the excess pad characters
    will be ignored.
+
+   If *canonical* is true, non-zero padding bits in the last group are rejected
+   with :exc:`binascii.Error`, enforcing canonical encoding as defined in
+   :rfc:`4648` section 3.5.
 
    Invalid base32 data will raise :exc:`binascii.Error`.
 
