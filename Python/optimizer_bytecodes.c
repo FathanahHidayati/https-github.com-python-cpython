@@ -730,14 +730,14 @@ dummy_func(void) {
     op(_LOAD_CONST, (-- value)) {
         PyCodeObject *co = get_current_code_object(ctx);
         PyObject *val = PyTuple_GET_ITEM(co->co_consts, oparg);
-        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)val);
+        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(val));
         value = PyJitRef_Borrow(sym_new_const(ctx, val));
     }
 
     op(_LOAD_COMMON_CONSTANT, (-- value)) {
         assert(oparg < NUM_COMMON_CONSTANTS);
         PyObject *val = _PyInterpreterState_GET()->common_consts[oparg];
-        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)val);
+        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(val));
         value = PyJitRef_Borrow(sym_new_const(ctx, val));
     }
 
@@ -745,7 +745,7 @@ dummy_func(void) {
         PyObject *val = PyLong_FromLong(oparg);
         assert(val);
         assert(_Py_IsImmortal(val));
-        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)val);
+        ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(val));
         value = PyJitRef_Borrow(sym_new_const(ctx, val));
     }
 
@@ -754,19 +754,19 @@ dummy_func(void) {
     }
 
     op(_LOAD_CONST_INLINE_BORROW, (ptr/4 -- value)) {
-        value = PyJitRef_Borrow(sym_new_const(ctx, ptr));
+        value = PyJitRef_Borrow(sym_new_const(ctx, PyStackRef_UntagBorrow(ptr)));
     }
 
     op(_POP_CALL_LOAD_CONST_INLINE_BORROW, (ptr/4, unused, unused -- value)) {
-        value = PyJitRef_Borrow(sym_new_const(ctx, ptr));
+        value = PyJitRef_Borrow(sym_new_const(ctx, PyStackRef_UntagBorrow(ptr)));
     }
 
     op(_POP_CALL_TWO_LOAD_CONST_INLINE_BORROW, (ptr/4, unused, unused, unused, unused -- value)) {
-        value = PyJitRef_Borrow(sym_new_const(ctx, ptr));
+        value = PyJitRef_Borrow(sym_new_const(ctx, PyStackRef_UntagBorrow(ptr)));
     }
 
     op(_SHUFFLE_2_LOAD_CONST_INLINE_BORROW, (ptr/4, unused, unused, arg -- res, a)) {
-        res = PyJitRef_Borrow(sym_new_const(ctx, ptr));
+        res = PyJitRef_Borrow(sym_new_const(ctx, PyStackRef_UntagBorrow(ptr)));
         a = arg;
     }
 
@@ -1215,7 +1215,7 @@ dummy_func(void) {
         if (type) {
             res = sym_new_const(ctx, type);
             ADD_OP(_SHUFFLE_2_LOAD_CONST_INLINE_BORROW, 0,
-                       (uintptr_t)type);
+                       PyStackRef_TagBorrow(type));
         }
         else {
             res = sym_new_not_null(ctx);
@@ -1252,7 +1252,7 @@ dummy_func(void) {
                 out = Py_True;
             }
             sym_set_const(res, out);
-            ADD_OP(_POP_CALL_TWO_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)out);
+            ADD_OP(_POP_CALL_TWO_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(out));
         }
     }
 
@@ -1607,7 +1607,7 @@ dummy_func(void) {
     }
 
     op(_REPLACE_WITH_TRUE, (value -- res, v)) {
-        ADD_OP(_INSERT_1_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)Py_True);
+        ADD_OP(_INSERT_1_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(Py_True));
         res = sym_new_const(ctx, Py_True);
         v = value;
     }
@@ -1892,7 +1892,7 @@ dummy_func(void) {
                 goto error;
             }
             if (_Py_IsImmortal(temp)) {
-                ADD_OP(_SHUFFLE_3_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)temp);
+                ADD_OP(_SHUFFLE_3_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(temp));
             }
             res = sym_new_const(ctx, temp);
             Py_DECREF(temp);
@@ -1913,7 +1913,7 @@ dummy_func(void) {
                 goto error;
             }
             if (_Py_IsImmortal(temp)) {
-                ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, (uintptr_t)temp);
+                ADD_OP(_LOAD_CONST_INLINE_BORROW, 0, PyStackRef_TagBorrow(temp));
             }
             len = sym_new_const(ctx, temp);
             Py_DECREF(temp);
