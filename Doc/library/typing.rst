@@ -2137,8 +2137,7 @@ without the dedicated syntax, as documented below.
    Type variable tuples created with ``covariant=True`` or
    ``contravariant=True`` can be used to declare covariant or contravariant
    generic types.  The ``bound`` argument is also accepted, similar to
-   :class:`TypeVar`.  However the actual semantics of these keywords are yet to
-   be decided.
+   :class:`TypeVar`, but its actual semantics are yet to be decided.
 
    .. versionadded:: 3.11
 
