@@ -1,0 +1,3 @@
+Add missing ``stacklevel`` to two :func:`warnings.warn` calls in
+:class:`subprocess.Popen` so that warnings correctly point to the caller's
+code instead of ``subprocess.py`` internals.
