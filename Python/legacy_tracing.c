@@ -676,7 +676,7 @@ static int
 maybe_set_opcode_trace(PyThreadState *tstate)
 {
     _PyInterpreterFrame *iframe = tstate->current_frame;
-    if (iframe == NULL) {
+    if (iframe == NULL || _PyFrame_IsExternalFrame(iframe)) {
         return 0;
     }
     PyFrameObject *frame = iframe->frame_obj;

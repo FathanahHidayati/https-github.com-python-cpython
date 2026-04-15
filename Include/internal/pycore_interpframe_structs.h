@@ -20,10 +20,20 @@ extern "C" {
 #endif
 
 enum _frameowner {
-    FRAME_OWNED_BY_THREAD = 0,
-    FRAME_OWNED_BY_GENERATOR = 1,
-    FRAME_OWNED_BY_FRAME_OBJECT = 2,
-    FRAME_OWNED_BY_INTERPRETER = 3,
+    // The frame is allocated on per-thread memory that will be freed or transferred when
+    // the frame unwinds.
+    FRAME_OWNED_BY_THREAD = 0x00,
+    // The frame is allocated in a generator and may out-live the execution.
+    FRAME_OWNED_BY_GENERATOR = 0x01,
+    // A flag which indicates the frame is owned externally. May be combined with
+    // FRAME_OWNED_BY_THREAD or FRAME_OWNED_BY_GENERATOR. The frame may only have
+    // _PyInterpreterFrameFields. To access other fields and ensure they are up to
+    // date _PyFrame_EnsureFrameFullyInitialized must be called first.
+    FRAME_OWNED_EXTERNALLY = 0x02,
+    // The frame is owned by the frame object (indicating the frame has unwound).
+    FRAME_OWNED_BY_FRAME_OBJECT = 0x04,
+    // The frame is a sentinel frame for entry to the interpreter loop
+    FRAME_OWNED_BY_INTERPRETER = 0x08,
 };
 
 struct _PyInterpreterFrame {
@@ -84,6 +94,15 @@ struct _PyCoroObject {
 struct _PyAsyncGenObject {
     _PyGenObject_HEAD(ag)
 };
+
+typedef void (*_PyFrame_Reifier)(struct _PyInterpreterFrame *, PyObject *reifier);
+
+typedef struct {
+    PyObject_HEAD
+    PyCodeObject *ef_code;
+    PyObject *ef_state;
+    _PyFrame_Reifier ef_reifier;
+} PyUnstable_PyExternalExecutable;
 
 #undef _PyGenObject_HEAD
 

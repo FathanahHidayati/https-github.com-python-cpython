@@ -1621,7 +1621,7 @@ first_line_not_before(int *lines, int len, int line)
 static bool frame_is_suspended(PyFrameObject *frame)
 {
     assert(!_PyFrame_IsIncomplete(frame->f_frame));
-    if (frame->f_frame->owner == FRAME_OWNED_BY_GENERATOR) {
+    if (frame->f_frame->owner & FRAME_OWNED_BY_GENERATOR) {
         PyGenObject *gen = _PyGen_GetGeneratorFromFrame(frame->f_frame);
         return FRAME_STATE_SUSPENDED(gen->gi_frame_state);
     }
@@ -1901,7 +1901,7 @@ static PyObject *
 frame_generator_get_impl(PyFrameObject *self)
 /*[clinic end generated code: output=97aeb2392562e55b input=00a2bd008b239ab0]*/
 {
-    if (self->f_frame->owner == FRAME_OWNED_BY_GENERATOR) {
+    if (self->f_frame->owner & FRAME_OWNED_BY_GENERATOR) {
         PyObject *gen = (PyObject *)_PyGen_GetGeneratorFromFrame(self->f_frame);
         return Py_NewRef(gen);
     }
@@ -2008,13 +2008,14 @@ static PyObject *
 frame_clear_impl(PyFrameObject *self)
 /*[clinic end generated code: output=864c662f16e9bfcc input=c358f9cff5f9b681]*/
 {
-    if (self->f_frame->owner == FRAME_OWNED_BY_GENERATOR) {
+    if (self->f_frame->owner & FRAME_OWNED_BY_GENERATOR) {
         PyGenObject *gen = _PyGen_GetGeneratorFromFrame(self->f_frame);
         if (_PyGen_ClearFrame(gen) < 0) {
             return NULL;
         }
     }
-    else if (self->f_frame->owner == FRAME_OWNED_BY_THREAD) {
+    else if (self->f_frame->owner == FRAME_OWNED_BY_THREAD ||
+             _PyFrame_IsExternalFrame(self->f_frame)) {
         PyErr_SetString(PyExc_RuntimeError,
                         "cannot clear an executing frame");
         return NULL;
@@ -2274,6 +2275,8 @@ _PyFrame_HasHiddenLocals(_PyInterpreterFrame *frame)
 PyObject *
 _PyFrame_GetLocals(_PyInterpreterFrame *frame)
 {
+    _PyFrame_EnsureFrameFullyInitialized(frame);
+
     // We should try to avoid creating the FrameObject if possible.
     // So we check if the frame is a module or class level scope
     PyCodeObject *co = _PyFrame_GetCode(frame);
