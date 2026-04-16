@@ -1555,6 +1555,7 @@ dummy_func(
             DEAD(retval);
             SAVE_STACK();
             assert(STACK_LEVEL() == 0);
+            DTRACE_FUNCTION_RETURN();
             _Py_LeaveRecursiveCallPy(tstate);
             // GH-99729: We need to unlink the frame *before* clearing it:
             _PyInterpreterFrame *dying = frame;
@@ -1747,6 +1748,7 @@ dummy_func(
             _PyStackRef temp = retval;
             DEAD(retval);
             SAVE_STACK();
+            DTRACE_FUNCTION_RETURN();
             tstate->exc_info = gen->gi_exc_state.previous_item;
             gen->gi_exc_state.previous_item = NULL;
             _Py_LeaveRecursiveCallPy(tstate);
@@ -4426,6 +4428,7 @@ dummy_func(
             tstate->py_recursion_remaining--;
             LOAD_SP();
             LOAD_IP(0);
+            DTRACE_FUNCTION_ENTRY();
             LLTRACE_RESUME_FRAME();
         }
 
@@ -6326,6 +6329,12 @@ dummy_func(
 
         spilled label(exit_unwind) {
             assert(_PyErr_Occurred(tstate));
+            DTRACE_FUNCTION_RETURN();
+            goto exit_unwind_notrace;
+        }
+
+        spilled label(exit_unwind_notrace) {
+            assert(_PyErr_Occurred(tstate));
             _Py_LeaveRecursiveCallPy(tstate);
             assert(frame->owner != FRAME_OWNED_BY_INTERPRETER);
             // GH-99729: We need to unlink the frame *before* clearing it:
@@ -6357,8 +6366,9 @@ dummy_func(
         spilled label(start_frame) {
             int too_deep = _Py_EnterRecursivePy(tstate);
             if (too_deep) {
-                goto exit_unwind;
+                goto exit_unwind_notrace;
             }
+            DTRACE_FUNCTION_ENTRY();
             next_instr = frame->instr_ptr;
         #ifdef Py_DEBUG
             int lltrace = maybe_lltrace_resume_frame(frame, GLOBALS());
@@ -6454,6 +6464,7 @@ dummy_func(
  error:
  exception_unwind:
  exit_unwind:
+ exit_unwind_notrace:
  handle_eval_breaker:
  resume_frame:
  start_frame:
