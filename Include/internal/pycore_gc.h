@@ -348,7 +348,7 @@ extern Py_ssize_t _PyGC_Collect(PyThreadState *tstate, int generation, _PyGC_Rea
 extern void _PyGC_CollectNoFail(PyThreadState *tstate);
 
 /* Freeze objects tracked by the GC and ignore them in future collections. */
-extern void _PyGC_Freeze(PyInterpreterState *interp);
+PyAPI_FUNC(void) _PyGC_Freeze(PyInterpreterState *interp);
 /* Unfreezes objects placing them in the oldest generation */
 extern void _PyGC_Unfreeze(PyInterpreterState *interp);
 /* Number of frozen objects */

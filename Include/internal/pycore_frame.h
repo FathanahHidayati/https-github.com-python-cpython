@@ -38,7 +38,7 @@ struct _frame {
     PyObject *_f_frame_data[1];
 };
 
-extern PyFrameObject* _PyFrame_New_NoTrack(PyCodeObject *code);
+PyAPI_FUNC(PyFrameObject *) _PyFrame_New_NoTrack(PyCodeObject *code);
 
 
 /* other API */
