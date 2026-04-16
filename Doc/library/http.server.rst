@@ -207,6 +207,14 @@ instantiation, of which this module provides three different variants:
       header (using :meth:`send_header`) in all of its responses to clients.
       For backwards compatibility, the setting defaults to ``'HTTP/1.0'``.
 
+   .. attribute:: default_content_type
+
+      Specifies the Content-Type header value sent when the MIME type
+      cannot be guessed from the file extension of the requested URL.
+      By default, it is set to ``'application/octet-stream'``.
+
+      .. versionadded:: next
+
    .. attribute:: MessageClass
 
       Specifies an :class:`email.message.Message`\ -like class to parse HTTP
@@ -527,6 +535,18 @@ The following options are accepted:
       python -m http.server --protocol HTTP/1.1
 
    .. versionadded:: 3.11
+
+.. option:: --content-type <content_type>
+
+   Specifies the Content-Type HTTP header. By default, the server uses the
+   MIME type ``'application/octet-stream'`` for the ``Content-Type`` header
+   when the content type cannot be guessed from the URL's extension (if any):
+
+   .. code-block:: bash
+
+      python -m http.server --content-type text/html
+
+   .. versionadded:: next
 
 .. option:: --tls-cert
 
