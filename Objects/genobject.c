@@ -87,7 +87,7 @@ gen_traverse(PyObject *self, visitproc visit, void *arg)
     if (gen->gi_frame_state != FRAME_CLEARED) {
         _PyInterpreterFrame *frame = &gen->gi_iframe;
         assert(frame->frame_obj == NULL ||
-               frame->frame_obj->f_frame->owner == FRAME_OWNED_BY_GENERATOR);
+               frame->frame_obj->f_frame->owner & FRAME_OWNED_BY_GENERATOR);
         int err = _PyFrame_Traverse(frame, visit, arg);
         if (err) {
             return err;

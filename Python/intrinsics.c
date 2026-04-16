@@ -141,7 +141,7 @@ static PyObject *
 stopiteration_error(PyThreadState* tstate, PyObject *exc)
 {
     _PyInterpreterFrame *frame = tstate->current_frame;
-    assert(frame->owner == FRAME_OWNED_BY_GENERATOR);
+    assert(frame->owner & FRAME_OWNED_BY_GENERATOR);
     assert(PyExceptionInstance_Check(exc));
     const char *msg = NULL;
     if (PyErr_GivenExceptionMatches(exc, PyExc_StopIteration)) {

@@ -4425,6 +4425,7 @@ register_lazy_on_parent(PyThreadState *tstate, PyObject *name,
                     goto done;
                 }
                 if (!contains) {
+                    _PyFrame_EnsureFrameFullyInitialized(tstate->current_frame);
                     PyObject *lazy_module_attr = _PyLazyImport_New(
                         tstate->current_frame, builtins, parent, child
                     );
@@ -4493,6 +4494,9 @@ _PyImport_LazyImportModuleLevelObject(PyThreadState *tstate,
 
     PyInterpreterState *interp = tstate->interp;
     _PyInterpreterFrame *frame = _PyEval_GetFrame();
+    if (frame != NULL) {
+        _PyFrame_EnsureFrameFullyInitialized(frame);
+    }
     if (frame == NULL || frame->f_globals != frame->f_locals) {
         Py_DECREF(abs_name);
         PyErr_SetString(PyExc_SyntaxError,
@@ -5600,6 +5604,7 @@ publish_lazy_imports_on_module(PyThreadState *tstate,
         }
         // Create a new lazy module attr for the subpackage which was
         // previously lazily imported.
+        _PyFrame_EnsureFrameFullyInitialized(tstate->current_frame);
         PyObject *lazy_module_attr = _PyLazyImport_New(tstate->current_frame, builtins,
                                                        name, attr_name);
         if (lazy_module_attr == NULL) {

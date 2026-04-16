@@ -12684,6 +12684,7 @@ super_init_without_args(_PyInterpreterFrame *cframe, PyTypeObject **type_p,
     }
 
     assert(_PyFrame_GetCode(cframe)->co_nlocalsplus > 0);
+    _PyFrame_EnsureFrameFullyInitialized(cframe);
     PyObject *firstarg = PyStackRef_AsPyObjectBorrow(_PyFrame_GetLocalsArray(cframe)[0]);
     if (firstarg == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "super(): arg[0] deleted");

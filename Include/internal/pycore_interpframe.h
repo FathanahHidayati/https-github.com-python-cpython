@@ -17,9 +17,37 @@ extern "C" {
 #define _PyInterpreterFrame_LASTI(IF) \
     ((int)((IF)->instr_ptr - _PyFrame_GetBytecode((IF))))
 
+PyAPI_DATA(PyTypeObject) PyUnstable_ExternalExecutable_Type;
+
+#define PyUnstable_ExternalExecutable_Check(op) Py_IS_TYPE((op), &PyUnstable_ExternalExecutable_Type)
+
+// Initialize a potentially external frame and make it safe to access the
+// all of the members of the returned _PyInterpreterFrame. The returned
+// value will be the same address as the passed in pointer.
+PyAPI_FUNC(void) _PyFrame_InitializeExternalFrame(_PyInterpreterFrame *frame);
+
+PyAPI_FUNC(PyObject *) PyUnstable_MakeExternalExecutable(_PyFrame_Reifier reifier, PyCodeObject *code, PyObject *state);
+
+static inline bool _PyFrame_IsExternalFrame(_PyInterpreterFrame *frame)
+{
+    return frame->owner & FRAME_OWNED_EXTERNALLY;
+}
+
+static inline void
+_PyFrame_EnsureFrameFullyInitialized(_PyInterpreterFrame *frame)
+{
+    if (_PyFrame_IsExternalFrame(frame)) {
+        _PyFrame_InitializeExternalFrame(frame);
+    }
+}
+
 static inline PyCodeObject *_PyFrame_GetCode(_PyInterpreterFrame *f) {
     assert(!PyStackRef_IsNull(f->f_executable));
     PyObject *executable = PyStackRef_AsPyObjectBorrow(f->f_executable);
+    if (f->owner & FRAME_OWNED_EXTERNALLY) {
+        assert(PyUnstable_ExternalExecutable_Check(executable));
+        return ((PyUnstable_PyExternalExecutable *)executable)->ef_code;
+    }
     assert(PyCode_Check(executable));
     return (PyCodeObject *)executable;
 }
@@ -30,12 +58,6 @@ static inline PyCodeObject *_PyFrame_GetCode(_PyInterpreterFrame *f) {
 static inline PyCodeObject* _Py_NO_SANITIZE_THREAD
 _PyFrame_SafeGetCode(_PyInterpreterFrame *f)
 {
-    // globals and builtins may be NULL on a legit frame, but it's unlikely.
-    // It's more likely that it's a sign of an invalid frame.
-    if (f->f_globals == NULL || f->f_builtins == NULL) {
-        return NULL;
-    }
-
     if (PyStackRef_IsNull(f->f_executable)) {
         return NULL;
     }
@@ -48,6 +70,18 @@ _PyFrame_SafeGetCode(_PyInterpreterFrame *f)
     if (_PyObject_IsFreed(executable)) {
         return NULL;
     }
+    if (_PyFrame_IsExternalFrame(f)) {
+        executable = (PyObject *)((PyUnstable_PyExternalExecutable *)executable)->ef_code;
+        if (_PyObject_IsFreed(executable)) {
+            return NULL;
+        }
+    } else {
+        // globals and builtins may be NULL on a legit frame, but it's unlikely.
+        // It's more likely that it's a sign of an invalid frame.
+        if (f->f_globals == NULL || f->f_builtins == NULL) {
+            return NULL;
+        }
+    }
     if (!PyCode_Check(executable)) {
         return NULL;
     }
@@ -59,6 +93,7 @@ _PyFrame_GetBytecode(_PyInterpreterFrame *f)
 {
 #ifdef Py_GIL_DISABLED
     PyCodeObject *co = _PyFrame_GetCode(f);
+    _PyFrame_EnsureFrameFullyInitialized(f);
     _PyCodeArray *tlbc = _PyCode_GetTLBCArray(co);
     assert(f->tlbc_index >= 0 && f->tlbc_index < tlbc->size);
     return (_Py_CODEUNIT *)tlbc->entries[f->tlbc_index];
@@ -81,6 +116,7 @@ _PyFrame_SafeGetLasti(struct _PyInterpreterFrame *f)
     }
 
     _Py_CODEUNIT *bytecode;
+    _PyFrame_EnsureFrameFullyInitialized(f);
 #ifdef Py_GIL_DISABLED
     _PyCodeArray *tlbc = _PyCode_GetTLBCArray(co);
     assert(f->tlbc_index >= 0 && f->tlbc_index < tlbc->size);
@@ -261,10 +297,11 @@ _PyFrame_IsIncomplete(_PyInterpreterFrame *frame)
 {
     if (frame->owner >= FRAME_OWNED_BY_INTERPRETER) {
         return true;
+    } else if (frame->owner & (FRAME_OWNED_BY_GENERATOR|FRAME_OWNED_EXTERNALLY)) {
+        return false;
     }
-    return frame->owner != FRAME_OWNED_BY_GENERATOR &&
-           frame->instr_ptr < _PyFrame_GetBytecode(frame) +
-                                  _PyFrame_GetCode(frame)->_co_firsttraceable;
+    return frame->instr_ptr < _PyFrame_GetBytecode(frame) +
+           _PyFrame_GetCode(frame)->_co_firsttraceable;
 }
 
 static inline _PyInterpreterFrame *
@@ -276,10 +313,64 @@ _PyFrame_GetFirstComplete(_PyInterpreterFrame *frame)
     return frame;
 }
 
+#if Py_DEBUG
+
+static inline bool _Py_NO_SANITIZE_THREAD
+_PyFrame_IsIncompleteOrUninitialized(_PyInterpreterFrame *frame)
+{
+    if (frame->owner >= FRAME_OWNED_BY_INTERPRETER || _PyFrame_IsExternalFrame(frame)) {
+        return true;
+    }
+    return !(frame->owner & FRAME_OWNED_BY_GENERATOR) &&
+           frame->instr_ptr < _PyFrame_GetBytecode(frame) +
+                             _PyFrame_GetCode(frame)->_co_firsttraceable;
+}
+
+static inline _PyInterpreterFrame *
+_PyFrame_GetFirstCompleteInitialized(_PyInterpreterFrame *frame)
+{
+    while (frame && _PyFrame_IsIncompleteOrUninitialized(frame)) {
+        frame = frame->previous;
+    }
+    return frame;
+}
+
+#endif
+
+static inline bool
+_PyFrame_StackpointerSaved(void)
+{
+#if Py_DEBUG
+    PyThreadState *tstate = PyThreadState_GET();
+    return _PyFrame_GetFirstCompleteInitialized(tstate->current_frame) == NULL ||
+           _PyFrame_GetFirstCompleteInitialized(tstate->current_frame)->stackpointer != NULL;
+#else
+    return true;
+#endif
+}
+
+
+
 static inline _PyInterpreterFrame *
 _PyThreadState_GetFrame(PyThreadState *tstate)
 {
     return _PyFrame_GetFirstComplete(tstate->current_frame);
+}
+
+static inline PyObject *
+_PyFrame_GetGlobals(_PyInterpreterFrame *frame) {
+    if (frame->f_globals == NULL) {
+        frame->f_globals = _PyFrame_GetFunction(frame)->func_globals;
+    }
+    return frame->f_globals;
+}
+
+static inline PyObject *
+_PyFrame_GetBuiltins(_PyInterpreterFrame *frame) {
+    if (frame->f_builtins == NULL) {
+        frame->f_builtins = _PyFrame_GetFunction(frame)->func_builtins;
+    }
+    return frame->f_builtins;
 }
 
 /* For use by _PyFrame_GetFrameObject
@@ -293,9 +384,9 @@ _PyFrame_MakeAndSetFrameObject(_PyInterpreterFrame *frame);
 static inline PyFrameObject *
 _PyFrame_GetFrameObject(_PyInterpreterFrame *frame)
 {
-
+    _PyFrame_EnsureFrameFullyInitialized(frame);
     assert(!_PyFrame_IsIncomplete(frame));
-    PyFrameObject *res =  frame->frame_obj;
+    PyFrameObject *res = frame->frame_obj;
     if (res != NULL) {
         return res;
     }
@@ -314,7 +405,7 @@ _PyFrame_ClearLocals(_PyInterpreterFrame *frame);
  * take should  be set to 1 for heap allocated
  * frames like the ones in generators and coroutines.
  */
-void
+PyAPI_FUNC(void)
 _PyFrame_ClearExceptCode(_PyInterpreterFrame * frame);
 
 int
@@ -363,7 +454,7 @@ _PyFrame_PushUnchecked(PyThreadState *tstate, _PyStackRef func, int null_locals_
 /* Pushes a trampoline frame without checking for space.
  * Must be guarded by _PyThreadState_HasStackSpace() */
 static inline _PyInterpreterFrame *
-_PyFrame_PushTrampolineUnchecked(PyThreadState *tstate, PyCodeObject *code, int stackdepth, _PyInterpreterFrame * previous)
+_PyFrame_PushTrampolineUnchecked(PyThreadState *tstate, PyCodeObject *code, int stackdepth, _PyInterpreterFrame *previous)
 {
     CALL_STAT_INC(frames_pushed);
     _PyInterpreterFrame *frame = (_PyInterpreterFrame *)tstate->datastack_top;
