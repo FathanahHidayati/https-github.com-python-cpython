@@ -39,18 +39,38 @@ import sys as _sys
 import types as _types
 from io import StringIO as _StringIO
 
+lazy import _colorize
+lazy from _pyrepl.utils import disp_str, gen_colors
+
 __all__ = ["pprint","pformat","isreadable","isrecursive","saferepr",
            "PrettyPrinter", "pp"]
 
 
-def pprint(object, stream=None, indent=1, width=80, depth=None, *,
-           compact=False, expand=False, sort_dicts=True,
-           underscore_numbers=False):
+def pprint(
+    object,
+    stream=None,
+    indent=1,
+    width=80,
+    depth=None,
+    *,
+    color=True,
+    compact=False,
+    expand=False,
+    sort_dicts=True,
+    underscore_numbers=False,
+):
     """Pretty-print a Python object to a stream [default is sys.stdout]."""
     printer = PrettyPrinter(
-        stream=stream, indent=indent, width=width, depth=depth,
-        compact=compact, expand=expand, sort_dicts=sort_dicts,
-        underscore_numbers=underscore_numbers)
+        stream=stream,
+        indent=indent,
+        width=width,
+        depth=depth,
+        color=color,
+        compact=compact,
+        expand=expand,
+        sort_dicts=sort_dicts,
+        underscore_numbers=underscore_numbers,
+    )
     printer.pprint(object)
 
 
@@ -111,10 +131,27 @@ def _safe_tuple(t):
     return _safe_key(t[0]), _safe_key(t[1])
 
 
+def _colorize_output(text):
+    """Apply syntax highlighting."""
+    colors = list(gen_colors(text))
+    chars, _ = disp_str(text, colors=colors, force_color=True, escape=False)
+    return "".join(chars)
+
+
 class PrettyPrinter:
-    def __init__(self, indent=1, width=80, depth=None, stream=None, *,
-                 compact=False, expand=False, sort_dicts=True,
-                 underscore_numbers=False):
+    def __init__(
+        self,
+        indent=1,
+        width=80,
+        depth=None,
+        stream=None,
+        *,
+        color=True,
+        compact=False,
+        expand=False,
+        sort_dicts=True,
+        underscore_numbers=False,
+    ):
         """Handle pretty printing operations onto a stream using a set of
         configured parameters.
 
@@ -130,6 +167,11 @@ class PrettyPrinter:
         stream
             The desired output stream.  If omitted (or false), the standard
             output stream available at construction will be used.
+
+        color
+            If true (the default), syntax highlighting is enabled for pprint
+            when the stream and environment variables permit.
+            If false, colored output is always disabled.
 
         compact
             If true, several items will be combined in one line.
@@ -168,10 +210,16 @@ class PrettyPrinter:
         self._expand = bool(expand)
         self._sort_dicts = sort_dicts
         self._underscore_numbers = underscore_numbers
+        self._color = color
 
     def pprint(self, object):
         if self._stream is not None:
-            self._format(object, self._stream, 0, 0, {}, 0)
+            if self._color and _colorize.can_colorize(file=self._stream):
+                sio = _StringIO()
+                self._format(object, sio, 0, 0, {}, 0)
+                self._stream.write(_colorize_output(sio.getvalue()))
+            else:
+                self._format(object, self._stream, 0, 0, {}, 0)
             self._stream.write("\n")
 
     def pformat(self, object):
