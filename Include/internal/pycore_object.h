@@ -283,7 +283,7 @@ Py_ssize_t _Py_ExplicitMergeRefcount(PyObject *op, Py_ssize_t extra);
 
 
 extern int _PyType_CheckConsistency(PyTypeObject *type);
-extern int _PyDict_CheckConsistency(PyObject *mp, int check_content);
+PyAPI_FUNC(int) _PyDict_CheckConsistency(PyObject *mp, int check_content);
 
 // Fast inlined version of PyType_HasFeature()
 static inline int
@@ -879,14 +879,14 @@ PyAPI_FUNC(PyObject *) _PyType_NewManagedObject(PyTypeObject *type);
 extern PyTypeObject* _PyType_CalculateMetaclass(PyTypeObject *, PyObject *);
 extern PyObject* _PyType_GetDocFromInternalDoc(const char *, const char *);
 extern PyObject* _PyType_GetTextSignatureFromInternalDoc(const char *, const char *, int);
-extern int _PyObject_SetAttributeErrorContext(PyObject *v, PyObject* name);
+PyAPI_FUNC(int) _PyObject_SetAttributeErrorContext(PyObject *v, PyObject* name);
 
 void _PyObject_InitInlineValues(PyObject *obj, PyTypeObject *tp);
 extern int _PyObject_StoreInstanceAttribute(PyObject *obj,
                                             PyObject *name, PyObject *value);
 extern bool _PyObject_TryGetInstanceAttribute(PyObject *obj, PyObject *name,
                                               PyObject **attr);
-extern PyObject *_PyType_LookupRefAndVersion(PyTypeObject *, PyObject *,
+PyAPI_FUNC(PyObject *) _PyType_LookupRefAndVersion(PyTypeObject *, PyObject *,
                                              unsigned int *);
 
 // Internal API to look for a name through the MRO.
@@ -910,7 +910,7 @@ PyAPI_FUNC(_PyStackRef) _PyObject_GetAttrStackRef(PyObject *obj, PyObject *name)
 // deferred reference counting.
 //
 // Returns 1 if the value was cached or 0 otherwise.
-extern int _PyType_CacheInitForSpecialization(PyHeapTypeObject *type,
+PyAPI_FUNC(int) _PyType_CacheInitForSpecialization(PyHeapTypeObject *type,
                                               PyObject *init,
                                               unsigned int tp_version);
 

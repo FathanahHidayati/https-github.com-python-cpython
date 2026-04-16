@@ -702,7 +702,7 @@ struct _obmalloc_state {
  * Large-page and huge-page backends may round the mapped size up
  * internally, so pass the original requested size back to
  * _PyObject_VirtualFree(). */
-void *_PyObject_VirtualAlloc(size_t size);
+PyAPI_FUNC(void *) _PyObject_VirtualAlloc(size_t size);
 void _PyObject_VirtualFree(void *, size_t size);
 
 
