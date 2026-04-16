@@ -15,6 +15,7 @@
 #include "pycore_interpframe.h"
 #include "pycore_interpolation.h"
 #include "pycore_intrinsics.h"
+#include "pycore_jit_unwind.h"
 #include "pycore_lazyimportobject.h"
 #include "pycore_list.h"
 #include "pycore_long.h"
@@ -58,6 +59,28 @@ jit_error(const char *message)
     int hint = errno;
 #endif
     PyErr_Format(PyExc_RuntimeWarning, "JIT %s (%d)", message, hint);
+}
+
+static void
+jit_record_code(const void *code_addr, size_t code_size,
+                const char *entry, const char *filename)
+{
+#ifdef PY_HAVE_PERF_TRAMPOLINE
+    _PyPerf_Callbacks callbacks;
+    _PyPerfTrampoline_GetCallbacks(&callbacks);
+    if (callbacks.write_state == _Py_perfmap_jit_callbacks.write_state) {
+        _PyPerfJit_WriteNamedCode(
+            code_addr, code_size, entry, filename);
+        return;
+    }
+    _PyJitUnwind_GdbRegisterCode(
+        code_addr, code_size, entry, filename);
+#else
+    (void)code_addr;
+    (void)code_size;
+    (void)entry;
+    (void)filename;
+#endif
 }
 
 static size_t _Py_jit_shim_size = 0;
@@ -658,6 +681,10 @@ _PyJIT_Compile(_PyExecutorObject *executor, const _PyUOpInstruction trace[], siz
     }
     executor->jit_code = memory;
     executor->jit_size = total_size;
+    jit_record_code(memory,
+                    code_size + state.trampolines.size,
+                    "jit_entry",
+                    "<jit>");
     return 0;
 }
 
@@ -708,6 +735,10 @@ compile_shim(void)
         return NULL;
     }
     _Py_jit_shim_size = total_size;
+    jit_record_code(memory,
+                    code_size + state.trampolines.size,
+                    "jit_entry",
+                    "<jit>");
     return (_PyJitEntryFuncPtr)memory;
 }
 
@@ -739,6 +770,9 @@ _PyJIT_Free(_PyExecutorObject *executor)
     if (memory) {
         executor->jit_code = NULL;
         executor->jit_size = 0;
+#ifdef PY_HAVE_PERF_TRAMPOLINE
+        _PyJitUnwind_GdbUnregisterCode(memory);
+#endif
         if (jit_free(memory, size)) {
             PyErr_FormatUnraisable("Exception ignored while "
                                    "freeing JIT memory");
@@ -756,6 +790,9 @@ _PyJIT_Fini(void)
     if (size) {
         _Py_jit_entry = _Py_LazyJitShim;
         _Py_jit_shim_size = 0;
+#ifdef PY_HAVE_PERF_TRAMPOLINE
+        _PyJitUnwind_GdbUnregisterCode(memory);
+#endif
         if (jit_free(memory, size)) {
             PyErr_FormatUnraisable("Exception ignored while "
                                    "freeing JIT entry code");
