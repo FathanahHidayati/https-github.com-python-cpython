@@ -890,8 +890,12 @@ mimetypes
   - ``application/vnd.ms-cab-compressed`` for ``.cab`` extension
   - ``application/vnd.ms-htmlhelp`` for ``.chm`` extension
   - ``application/vnd.ms-officetheme`` for ``.thmx`` extension
+  - ``font/collection`` for ``.ttc`` extension
+  - ``haptics/ivs`` for ``.ivs`` extension
+  - ``haptics/hjif`` for ``.hjif`` extension
+  - ``haptics/hmpg`` for ``.hmpg`` extension
 
-  (Contributed by Charlie Lin in :gh:`145718`.)
+  (Contributed by Charlie Lin in :gh:`145718` and :gh:`145918`.)
 
 * Add ``image/jxl``. (Contributed by Foolbar in :gh:`144213`.)
 * Rename ``application/x-texinfo`` to ``application/texinfo``.
