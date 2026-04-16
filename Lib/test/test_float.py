@@ -8,6 +8,7 @@ import time
 import unittest
 
 from test import support
+from test.support import warnings_helper
 from test.support.testcase import FloatsAreIdenticalMixin
 from test.support.numbers import (
     VALID_UNDERSCORE_LITERALS,
@@ -672,6 +673,7 @@ class GeneralFloatCases(unittest.TestCase):
 
 @unittest.skipUnless(hasattr(float, "__getformat__"), "requires __getformat__")
 class FormatFunctionsTestCase(unittest.TestCase):
+    @warnings_helper.ignore_warnings(category=DeprecationWarning)
     def test_getformat(self):
         self.assertIn(float.__getformat__('double'),
                       ['unknown', 'IEEE, big-endian', 'IEEE, little-endian'])
